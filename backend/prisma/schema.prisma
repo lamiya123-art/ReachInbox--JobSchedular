@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Sender {
+  id        String     @id @default(uuid())
+  name      String
+  email     String     @unique
+  smtpHost  String
+  smtpPort  Int
+  smtpUser  String
+  smtpPass  String
+  createdAt DateTime   @default(now())
+  EmailJob  EmailJob[]
+}
+
+model EmailJob {
+  id            String    @id @default(uuid())
+  campaignId    String
+  senderId      String
+  recipient     String
+  subject       String
+  body          String
+  scheduledFor  DateTime
+  nextAttemptAt DateTime
+  status        String    @default("PENDING") // PENDING, QUEUED, SENT, FAILED, RESCHEDULED
+  bullJobId     String?   @unique
+  attempts      Int       @default(0)
+  lastError     String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sender Sender @relation(fields: [senderId], references: [id])
+
+  @@index([status, scheduledFor])
+  @@index([campaignId])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  googleId  String   @unique
+  email     String
+  name      String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+}
