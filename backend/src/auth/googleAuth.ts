@@ -75,5 +75,19 @@ export async function handleGoogleCallback(code: string) {
     },
   });
 
+  // Upsert corresponding Sender identity for the logged-in user
+  await prisma.sender.upsert({
+    where: { email },
+    update: { name },
+    create: {
+      name,
+      email,
+      smtpHost: 'smtp.ethereal.email',
+      smtpPort: 587,
+      smtpUser: process.env.ETHEREAL_USER || 'ethereal_user',
+      smtpPass: process.env.ETHEREAL_PASS || 'ethereal_pass',
+    },
+  });
+
   return user;
 }

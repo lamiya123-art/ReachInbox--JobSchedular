@@ -123,9 +123,20 @@ apiRouter.post('/emails/schedule', async (req: Request, res: Response) => {
 
     let activeSenderId = senderId;
     if (!activeSenderId) {
-      const defaultSender = await prisma.sender.findFirst();
+      let defaultSender = await prisma.sender.findFirst();
       if (!defaultSender) {
-        return res.status(400).json({ error: 'No sender identity found in system.' });
+        defaultSender = await prisma.sender.upsert({
+          where: { email: 'oliver.brown@domain.io' },
+          update: {},
+          create: {
+            name: 'Oliver Brown',
+            email: 'oliver.brown@domain.io',
+            smtpHost: 'smtp.ethereal.email',
+            smtpPort: 587,
+            smtpUser: 'ethereal_user',
+            smtpPass: 'ethereal_pass',
+          },
+        });
       }
       activeSenderId = defaultSender.id;
     }
@@ -266,9 +277,52 @@ apiRouter.get('/emails/sent', async (req: Request, res: Response) => {
 // GET /senders
 apiRouter.get('/senders', async (req: Request, res: Response) => {
   try {
-    const senders = await prisma.sender.findMany({
+    const userId = req.cookies?.reachinbox_user;
+    if (userId) {
+      const loggedUser = await prisma.user.findUnique({ where: { id: userId } });
+      if (loggedUser) {
+        await prisma.sender.upsert({
+          where: { email: loggedUser.email },
+          update: { name: loggedUser.name },
+          create: {
+            name: loggedUser.name,
+            email: loggedUser.email,
+            smtpHost: 'smtp.ethereal.email',
+            smtpPort: 587,
+            smtpUser: process.env.ETHEREAL_USER || 'ethereal_user',
+            smtpPass: process.env.ETHEREAL_PASS || 'ethereal_pass',
+          },
+        });
+      }
+    }
+
+    let senders = await prisma.sender.findMany({
       orderBy: { createdAt: 'asc' },
     });
+
+    if (senders.length === 0) {
+      const defaultSender = await prisma.sender.upsert({
+        where: { email: 'oliver.brown@domain.io' },
+        update: {},
+        create: {
+          name: 'Oliver Brown',
+          email: 'oliver.brown@domain.io',
+          smtpHost: 'smtp.ethereal.email',
+          smtpPort: 587,
+          smtpUser: 'ethereal_user',
+          smtpPass: 'ethereal_pass',
+        },
+      });
+      senders = [defaultSender];
+    }
+
+    if (userId) {
+      const loggedUser = await prisma.user.findUnique({ where: { id: userId } });
+      if (loggedUser) {
+        senders.sort((a, b) => (a.email === loggedUser.email ? -1 : b.email === loggedUser.email ? 1 : 0));
+      }
+    }
+
     return res.json(senders);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

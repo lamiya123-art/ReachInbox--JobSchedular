@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sender, ScheduleEmailPayload } from '../lib/types';
+import { Sender, User, ScheduleEmailPayload } from '../lib/types';
 import { scheduleEmails } from '../lib/api';
 import CsvUploaderModal from './CsvUploaderModal';
 import SendLaterPopover from './SendLaterPopover';
@@ -30,10 +30,11 @@ interface ComposeModalProps {
   isOpen: boolean;
   onClose: () => void;
   senders: Sender[];
+  user?: User | null;
   onSuccess: () => void;
 }
 
-export default function ComposeModal({ isOpen, onClose, senders, onSuccess }: ComposeModalProps) {
+export default function ComposeModal({ isOpen, onClose, senders, user, onSuccess }: ComposeModalProps) {
   const [selectedSenderId, setSelectedSenderId] = useState(senders[0]?.id || '');
   const [recipientInput, setRecipientInput] = useState('');
   const [recipients, setRecipients] = useState<string[]>(['john.smith@domain.io']);
@@ -59,16 +60,46 @@ export default function ComposeModal({ isOpen, onClose, senders, onSuccess }: Co
     content: '<p>Hi John,</p><p>Following up on our recent conversation regarding your email campaign.</p><p>Best regards,<br/>Oliver</p>',
   });
 
+  // Sync selectedSenderId when senders prop or user updates (preferring logged-in user email)
+  React.useEffect(() => {
+    if (senders && senders.length > 0) {
+      if (user?.email) {
+        const userSender = senders.find((s) => s.email.toLowerCase() === user.email.toLowerCase());
+        if (userSender) {
+          setSelectedSenderId(userSender.id);
+          return;
+        }
+      }
+      if (!selectedSenderId || !senders.some((s) => s.id === selectedSenderId)) {
+        setSelectedSenderId(senders[0].id);
+      }
+    }
+  }, [senders, user, selectedSenderId]);
+
   if (!isOpen) return null;
 
+  const commitPendingRecipient = (currentList: string[], input: string) => {
+    const email = input.trim().toLowerCase();
+    if (email && !currentList.includes(email)) {
+      return [...currentList, email];
+    }
+    return currentList;
+  };
+
   const handleAddRecipient = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
       e.preventDefault();
-      const email = recipientInput.trim().toLowerCase();
-      if (email && !recipients.includes(email)) {
-        setRecipients([...recipients, email]);
-        setRecipientInput('');
-      }
+      const updated = commitPendingRecipient(recipients, recipientInput);
+      setRecipients(updated);
+      setRecipientInput('');
+    }
+  };
+
+  const handleInputBlur = () => {
+    if (recipientInput.trim()) {
+      const updated = commitPendingRecipient(recipients, recipientInput);
+      setRecipients(updated);
+      setRecipientInput('');
     }
   };
 
@@ -87,7 +118,13 @@ export default function ComposeModal({ isOpen, onClose, senders, onSuccess }: Co
   };
 
   const handleSend = async () => {
-    if (recipients.length === 0) {
+    const finalRecipients = commitPendingRecipient(recipients, recipientInput);
+    if (finalRecipients.length > recipients.length) {
+      setRecipients(finalRecipients);
+      setRecipientInput('');
+    }
+
+    if (finalRecipients.length === 0) {
       setToastMsg({ type: 'error', message: 'Please add at least one recipient email address.' });
       return;
     }
@@ -101,14 +138,16 @@ export default function ComposeModal({ isOpen, onClose, senders, onSuccess }: Co
     setIsSubmitting(true);
     setToastMsg(null);
 
+    const activeSenderId = selectedSenderId || senders[0]?.id;
+
     const payload: ScheduleEmailPayload = {
       subject,
       body: htmlBody,
-      recipients,
+      recipients: finalRecipients,
       startTime: startTime || new Date().toISOString(),
       delayMs,
       hourlyLimit,
-      senderId: selectedSenderId || senders[0]?.id,
+      senderId: activeSenderId,
     };
 
     try {
@@ -209,11 +248,19 @@ export default function ComposeModal({ isOpen, onClose, senders, onSuccess }: Co
               onChange={(e) => setSelectedSenderId(e.target.value)}
               className="flex-1 bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer"
             >
-              {senders.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} &lt;{s.email}&gt;
-                </option>
-              ))}
+              {senders.length === 0 ? (
+                user ? (
+                  <option value="">{user.name} &lt;{user.email}&gt;</option>
+                ) : (
+                  <option value="">Oliver Brown &lt;oliver.brown@domain.io&gt;</option>
+                )
+              ) : (
+                senders.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} &lt;{s.email}&gt;
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -240,6 +287,7 @@ export default function ComposeModal({ isOpen, onClose, senders, onSuccess }: Co
                 value={recipientInput}
                 onChange={(e) => setRecipientInput(e.target.value)}
                 onKeyDown={handleAddRecipient}
+                onBlur={handleInputBlur}
                 placeholder={recipients.length === 0 ? 'Type email & press Enter...' : 'Add email...'}
                 className="flex-1 min-w-[140px] bg-transparent text-xs text-slate-800 outline-none py-1"
               />

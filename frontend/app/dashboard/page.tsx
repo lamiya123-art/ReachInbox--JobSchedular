@@ -97,6 +97,7 @@ export default function DashboardPage() {
         isOpen={isComposeOpen}
         onClose={() => setIsComposeOpen(false)}
         senders={senders}
+        user={user}
         onSuccess={handleComposeSuccess}
       />
     </div>

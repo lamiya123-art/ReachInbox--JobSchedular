@@ -95,13 +95,17 @@ async function processEmailJob(job: Job<EmailJobData>) {
   try {
     console.log(`[Worker] Dispatching email to ${emailJob.recipient} via sender ${emailJob.sender.email}...`);
 
-    await sendEmail({
+    const mailResult = await sendEmail({
       fromName: emailJob.sender.name,
       fromEmail: emailJob.sender.email,
       to: emailJob.recipient,
       subject: emailJob.subject,
       body: emailJob.body,
     });
+
+    if (mailResult?.previewUrl) {
+      console.log(`[Worker] 📧 View email in Ethereal Sandbox Inbox: ${mailResult.previewUrl}`);
+    }
 
     await prisma.emailJob.update({
       where: { id: emailJobId },

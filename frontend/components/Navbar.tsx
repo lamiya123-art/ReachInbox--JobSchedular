@@ -9,7 +9,25 @@ interface NavbarProps {
   user?: User | null;
 }
 
+function getInitials(name: string): string {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'U';
+  if (parts.length === 1) {
+    return parts[0].substring(0, 2).toUpperCase();
+  }
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export default function Navbar({ user }: NavbarProps) {
+  const [imageError, setImageError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageError(false);
+  }, [user?.avatarUrl]);
+
+  const showAvatarImage = Boolean(user?.avatarUrl && !imageError);
+
   const handleLogout = async () => {
     try {
       await logoutUser();
@@ -36,15 +54,17 @@ export default function Navbar({ user }: NavbarProps) {
       <div className="flex items-center gap-4">
         {user ? (
           <div className="flex items-center gap-3 bg-slate-100/80 hover:bg-slate-100 border border-slate-200/80 rounded-full py-1 px-3.5 transition-colors">
-            {user.avatarUrl ? (
+            {showAvatarImage ? (
               <img
-                src={user.avatarUrl}
+                src={user.avatarUrl!}
                 alt={user.name}
+                referrerPolicy="no-referrer"
+                onError={() => setImageError(true)}
                 className="w-7 h-7 rounded-full object-cover border border-slate-300"
               />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-brand-500 text-white flex items-center justify-center text-xs font-semibold">
-                {user.name.charAt(0)}
+              <div className="w-7 h-7 rounded-full bg-brand-500 text-white flex items-center justify-center text-xs font-semibold select-none">
+                {getInitials(user.name)}
               </div>
             )}
             <div className="text-xs">
