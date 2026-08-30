@@ -5,7 +5,8 @@ import { Mail, ShieldCheck, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:4000/auth/google';
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    window.location.href = `${apiBaseUrl}/auth/google`;
   };
 
   return (
