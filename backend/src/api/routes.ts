@@ -21,6 +21,7 @@ const scheduleSchema = z.object({
 
 // GET /auth/google
 apiRouter.get('/auth/google', (req: Request, res: Response) => {
+  const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:3000';
   try {
     const authUrl = getGoogleAuthUrl();
     return res.redirect(authUrl);
@@ -39,7 +40,7 @@ apiRouter.get('/auth/google', (req: Request, res: Response) => {
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_REDIRECT_URI=http://localhost:4000/auth/google/callback</pre>
           </div>
-          <p style="margin-top: 1.5rem; text-align: right;"><a href="http://localhost:3000/login" style="color: #22c55e; text-decoration: none; font-weight: 600; font-size: 0.875rem;">← Back to Login</a></p>
+          <p style="margin-top: 1.5rem; text-align: right;"><a href="${frontendUrl}/login" style="color: #22c55e; text-decoration: none; font-weight: 600; font-size: 0.875rem;">← Back to Login</a></p>
         </div>
       </body>
       </html>
@@ -49,6 +50,7 @@ GOOGLE_REDIRECT_URI=http://localhost:4000/auth/google/callback</pre>
 
 // GET /auth/google/callback
 apiRouter.get('/auth/google/callback', async (req: Request, res: Response) => {
+  const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:3000';
   try {
     const code = req.query.code as string;
     if (!code) {
@@ -59,12 +61,12 @@ apiRouter.get('/auth/google/callback', async (req: Request, res: Response) => {
     // Set HTTP-only cookie with real user ID
     res.cookie('reachinbox_user', user.id, {
       httpOnly: true,
-      secure: false, // set to true in production HTTPS
+      secure: process.env.NODE_ENV === 'production', // set to true in production HTTPS
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     });
 
-    return res.redirect('http://localhost:3000/dashboard');
+    return res.redirect(`${frontendUrl}/dashboard`);
   } catch (err: any) {
     console.error('[OAuth Callback Error]', err);
     return res.status(400).send(`
@@ -75,7 +77,7 @@ apiRouter.get('/auth/google/callback', async (req: Request, res: Response) => {
         <div style="background: #1e293b; border: 1px solid #ef4444; border-radius: 16px; padding: 2rem; max-width: 540px;">
           <div style="color: #ef4444; font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem;">Google OAuth Error</div>
           <p style="color: #94a3b8; font-size: 0.875rem; line-height: 1.5;">${err.message}</p>
-          <p style="margin-top: 1.5rem; text-align: right;"><a href="http://localhost:3000/login" style="color: #22c55e; text-decoration: none; font-weight: 600; font-size: 0.875rem;">← Back to Login</a></p>
+          <p style="margin-top: 1.5rem; text-align: right;"><a href="${frontendUrl}/login" style="color: #22c55e; text-decoration: none; font-weight: 600; font-size: 0.875rem;">← Back to Login</a></p>
         </div>
       </body>
       </html>

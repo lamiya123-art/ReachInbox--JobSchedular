@@ -6,20 +6,25 @@ import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 dotenv.config();
 
-const clientID = process.env.GOOGLE_CLIENT_ID || '';
-const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
-const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:4000/auth/google/callback';
+export function getGoogleOAuthClient(): OAuth2Client {
+  const clientID = process.env.GOOGLE_CLIENT_ID || '';
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:4000/auth/google/callback';
+  return new OAuth2Client(clientID, clientSecret, redirectUri);
+}
 
-export const googleOAuthClient = new OAuth2Client(clientID, clientSecret, redirectUri);
+export const googleOAuthClient = getGoogleOAuthClient();
 
 export function getGoogleAuthUrl(): string {
+  const clientID = process.env.GOOGLE_CLIENT_ID || '';
   if (!clientID || clientID === 'mock-google-client-id') {
     throw new Error(
       'GOOGLE_CLIENT_ID is not configured in your .env file. Please set valid Google OAuth credentials.'
     );
   }
 
-  return googleOAuthClient.generateAuthUrl({
+  const client = getGoogleOAuthClient();
+  return client.generateAuthUrl({
     access_type: 'offline',
     scope: [
       'https://www.googleapis.com/auth/userinfo.profile',
@@ -35,20 +40,22 @@ export async function handleGoogleCallback(code: string) {
     throw new Error('Authorization code missing from Google callback parameter.');
   }
 
+  const clientID = process.env.GOOGLE_CLIENT_ID || '';
   if (!clientID || clientID === 'mock-google-client-id') {
     throw new Error(
       'GOOGLE_CLIENT_ID is not configured in your .env file. Unable to exchange Google OAuth code.'
     );
   }
 
-  const { tokens } = await googleOAuthClient.getToken(code);
-  googleOAuthClient.setCredentials(tokens);
+  const client = getGoogleOAuthClient();
+  const { tokens } = await client.getToken(code);
+  client.setCredentials(tokens);
 
   if (!tokens.id_token) {
     throw new Error('No ID Token returned by Google OAuth token exchange.');
   }
 
-  const ticket = await googleOAuthClient.verifyIdToken({
+  const ticket = await client.verifyIdToken({
     idToken: tokens.id_token,
     audience: clientID,
   });
